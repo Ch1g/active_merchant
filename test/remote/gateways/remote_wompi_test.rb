@@ -40,6 +40,46 @@ class RemoteWompiTest < Test::Unit::TestCase
     assert_equal 'La transacción fue rechazada (Sandbox)', response.message
   end
 
+  def test_successful_authorize_and_capture
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+
+    assert capture = @gateway.capture(@amount, response.authorization)
+    assert_success capture
+  end
+
+  def test_successful_auth_capture_void
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+
+    assert capture = @gateway.capture(@amount, response.authorization)
+    assert_success capture
+
+    assert void = @gateway.void(capture.authorization)
+    assert_success void
+  end
+
+  def test_partial_capture #is this a thing?
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+
+    assert capture = @gateway.capture(@amount - 1, response.authorization)
+    assert_success capture
+  end
+
+  def test_failed_authorize
+    response = @gateway.authorize(@amount, @declined_card, @options)
+    assert_failure response
+  end
+
+  def test_failed_capture #failing because of Validation error, so this may not be a :good_fail: ?
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+
+    assert capture = @gateway.capture(nil, '')
+    assert_failure capture
+  end
+
   def test_successful_refund
     purchase = @gateway.purchase(@amount, @credit_card, @options)
     assert_success purchase
