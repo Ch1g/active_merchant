@@ -10,42 +10,42 @@ module ActiveMerchant #:nodoc:
       self.display_name = 'FluidPay'
 
       RESPONSE_CODE_MAPPING = {
-        '0'        => 'Unknown',
-        '99'       => 'Pending payment',
-        '100'      => 'Approved',
-        '110'      => 'Partial approved',
-        '101'      => 'Approved, pending customer approval',
-        '200'      => 'Decline',
-        '201'      => 'Do not honor',
-        '202'      => 'Insufficient funds',
-        '203'      => 'Exceeds withdrawn limit',
-        '204'      => 'Invalid Transaction',
-        '205'      => 'SCA Decline',
-        '220'      => 'Invalid Amount',
-        '221'      => 'No such Issuer',
-        '222'      => 'No credit Acct',
-        '223'      => 'Expired Card',
-        '225'      => 'Invalid CVC',
-        '226'      => 'Cannot Verify Pin',
-        '240'      => 'Refer to issuer',
-        '250'      => 'Pick up card (no fraud)',
-        '251'      => 'Lost card, pick up (fraud account)',
-        '252'      => 'Stolen card, pick up (fraud account)',
-        '253'      => 'Pick up card, special condition',
-        '261'      => 'Stop recurring',
-        '262'      => 'Stop recurring',
-        '300'      => 'Gateway Decline',
-        '301'      => 'Gateway Decline - Duplicate Transaction',
-        '310'      => 'Gateway Decline - Rule Engine',
-        '320'      => 'Gateway Decline - Chargeback',
-        '321'      => 'Gateway Decline - Stop Fraud',
-        '322'      => 'Gateway Decline - Closed Contact',
-        '323'      => 'Gateway Decline - Stop Recurring',
-        '400'      => 'Transaction error returned by processor',
-        '410'      => 'Invalid merchant configuration',
-        '421'      => 'Communication error with processor',
-        '430'      => 'Duplicate transaction at processor',
-        '440'      => 'Processor Format error'
+        0        => 'Unknown',
+        99       => 'Pending payment',
+        100      => 'Approved',
+        110      => 'Partial approved',
+        101      => 'Approved, pending customer approval',
+        200      => 'Decline',
+        201      => 'Do not honor',
+        202      => 'Insufficient funds',
+        203      => 'Exceeds withdrawn limit',
+        204      => 'Invalid Transaction',
+        205      => 'SCA Decline',
+        220      => 'Invalid Amount',
+        221      => 'No such Issuer',
+        222      => 'No credit Acct',
+        223      => 'Expired Card',
+        225      => 'Invalid CVC',
+        226      => 'Cannot Verify Pin',
+        240      => 'Refer to issuer',
+        250      => 'Pick up card (no fraud)',
+        251      => 'Lost card, pick up (fraud account)',
+        252      => 'Stolen card, pick up (fraud account)',
+        253      => 'Pick up card, special condition',
+        261      => 'Stop recurring',
+        262      => 'Stop recurring',
+        300      => 'Gateway Decline',
+        301      => 'Gateway Decline - Duplicate Transaction',
+        310      => 'Gateway Decline - Rule Engine',
+        320      => 'Gateway Decline - Chargeback',
+        321      => 'Gateway Decline - Stop Fraud',
+        322      => 'Gateway Decline - Closed Contact',
+        323      => 'Gateway Decline - Stop Recurring',
+        400      => 'Transaction error returned by processor',
+        410      => 'Invalid merchant configuration',
+        421      => 'Communication error with processor',
+        430      => 'Duplicate transaction at processor',
+        440      => 'Processor Format error'
       }
 
       PAYMENT_TYPES = %i[sale authorize verification credit]
@@ -64,7 +64,7 @@ module ActiveMerchant #:nodoc:
         add_address(post, options)
         add_additional_data(post, options)
 
-        p commit('transaction', post)
+        commit('transaction', post)
       end
 
       private
@@ -191,7 +191,6 @@ module ActiveMerchant #:nodoc:
           'Content-Type' => 'application/json'
         }
         headers['Authorization'] = auth_header unless action == 'token-auth'
-        p headers
         headers
       end
 
@@ -200,7 +199,7 @@ module ActiveMerchant #:nodoc:
         when 'token-auth'
           response['status'] == 'successful'
         when 'transaction'
-          response['status'] == 'success'
+          response['data']['response'] == 'approved'
         else
           false
         end
@@ -209,7 +208,7 @@ module ActiveMerchant #:nodoc:
       def message_from(action, response)
         case action
         when 'transaction'
-          response['msg']
+          RESPONSE_CODE_MAPPING[response['data']['response_code']]
         end
       end
 
