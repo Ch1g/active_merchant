@@ -58,13 +58,56 @@ module ActiveMerchant #:nodoc:
 
       def purchase(options = {})
         requires!(options, :payment_method)
-
+        additional_params = %i[type amount tax_amount shipping_amount currency description order_id po_number ip_address email_receipt email_address create_vault_record]
         post = {}
+
         add_payment_method(post, options)
         add_address(post, options)
-        add_additional_data(post, options)
+        add_data(post, options, params)
 
-        commit('transaction', post)
+        commit(:post, 'transaction', post)
+      end
+
+      def create_customer_record(options = {})
+        post = {}
+
+        post[:default_billing_address] = options[:billing_address]
+        post[:default_shipping_address] = options[:shipping_address]
+        post[:default_payment] = options[:payment_method]
+        commit(:post, 'vault/customer', post)
+      end
+
+      def get_customer_record(customer_id)
+        commit(:get, "vault/#{customer_id}")
+      end
+
+      def create_address_record(customer_id, options = {})
+        params = %i[first_name last_name company line_1 line_2 city state postal_code country email phone fax]
+        post = {}
+
+        add_data(post, options, params)
+
+        commit(:post, "vault/customer/#{customer_id}/address", post)
+      end
+
+      def create_payment_method_record(customer_id, options = {})
+        requires!(options, :payment_method)
+        post = {}
+        params = case options[:payment_method]
+                 when :card
+                   payment_method = 'card'
+                   %i[number expiration_date]
+                 when :ach
+                   payment_method = 'ach'
+                   %i[account_number routing_number account_type sec_code]
+                 when :token
+                   payment_method = 'token'
+                   %i[token]
+                 end
+
+        add_data(post, options, params)
+
+        commit(:post, "vault/customer/#{customer_id}/#{payment_method}")
       end
 
       private
@@ -115,8 +158,7 @@ module ActiveMerchant #:nodoc:
         post
       end
 
-      def add_additional_data(post, options)
-        params = %i[type amount tax_amount shipping_amount currency description order_id po_number ip_address email_receipt email_address create_vault_record]
+      def add_data(post, options, params)
         params.each { |p| post[p] = options[p] }
         post
       end
@@ -126,7 +168,7 @@ module ActiveMerchant #:nodoc:
         return unless @username && @password
 
         post = { username: @username, password: @password }
-        @jwt_token = commit('token-auth', post).params['data']['token']
+        @jwt_token = commit(:post, 'token-auth', post).params['data']['token']
       end
 
       def parse(body)
@@ -135,9 +177,13 @@ module ActiveMerchant #:nodoc:
         JSON.parse(body)
       end
 
-      def commit(action, parameters)
+      def commit(method, action, parameters)
         begin
-          raw_response = ssl_post(url(action), post_data(action, parameters), request_headers(action))
+          if method == :get
+            raw_response = ssl_request(method, url(action), request_headers(action))
+          else
+            raw_response = ssl_request(method, url(action), post_data(action, parameters), request_headers(action))
+          end
           response = parse(raw_response)
         rescue ResponseError => e
           raw_response = e.response.body
