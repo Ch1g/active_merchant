@@ -58,12 +58,12 @@ module ActiveMerchant #:nodoc:
 
       def purchase(options = {})
         requires!(options, :payment_method)
-        additional_params = %i[type amount tax_amount shipping_amount currency description order_id po_number ip_address email_receipt email_address create_vault_record]
+        additional_params = %i[type amount tax_amount shipping_amount currency description order_id po_number ip_address email_receipt email_address create_vault_record processor_id]
         post = {}
 
         add_payment_method(post, options)
         add_address(post, options)
-        add_data(post, options, params)
+        add_data(post, options, additional_params)
 
         commit(:post, 'transaction', post)
       end
@@ -154,6 +154,8 @@ module ActiveMerchant #:nodoc:
 
         if options[:payment_method].has_key?(:token)
           post[:payment_method][:token] = options[:payment_method][:token]
+        elsif options[:payment_method].has_key?(:customer)
+          post[:payment_method][:customer] = options[:payment_method][:customer]
         end
         post
       end
@@ -177,10 +179,10 @@ module ActiveMerchant #:nodoc:
         JSON.parse(body)
       end
 
-      def commit(method, action, parameters)
+      def commit(method, action, parameters = {})
         begin
           if method == :get
-            raw_response = ssl_request(method, url(action), request_headers(action))
+            raw_response = ssl_get(url(action), request_headers(action))
           else
             raw_response = ssl_request(method, url(action), post_data(action, parameters), request_headers(action))
           end
@@ -191,10 +193,10 @@ module ActiveMerchant #:nodoc:
         end
 
         Response.new(
-          response['status'],
-          response['msg'],
-          response['data'],
-          error_code: success_from(action, response) ? nil : error_code_from(response),
+          success_from(action, response),
+          message_from(action, response),
+          response['data'] || {},
+          error_code: success_from(action, response) ? nil : error_code_from(action, response),
           network_transaction_id: network_transaction_id_from(response),
           avs_result: AVSResult.new(code: avs_code_from(response)),
           cvv_result: CVVResult.new(cvv_result_from(response))
@@ -209,8 +211,11 @@ module ActiveMerchant #:nodoc:
         response.dig('data', 'response_body', 'card', 'cvv_response_code')
       end
 
-      def error_code_from(response)
-        RESPONSE_CODE_MAPPING[response['error_code']]
+      def error_code_from(action, response)
+        case action
+        when 'transaction'
+          response.dig('data', 'response_code')
+        end
       end
 
       def url(action)
@@ -243,6 +248,8 @@ module ActiveMerchant #:nodoc:
         case action
         when 'token-auth'
           response['status'] == 'successful'
+        when 'transaction'
+          response['data']['response_code'] == 100
         else
           response['status'] == 'success'
         end
@@ -251,12 +258,12 @@ module ActiveMerchant #:nodoc:
       def message_from(action, response)
         case action
         when 'transaction'
-          RESPONSE_CODE_MAPPING[response['data']['response_code']]
+          RESPONSE_CODE_MAPPING[response.dig('data', 'response_code')]
         end
       end
 
       def network_transaction_id_from(response)
-        response.dig('data', 'response_body', 'card', 'id')
+        response.dig('data', 'id')
       end
 
       def post_data(action, parameters = {})
