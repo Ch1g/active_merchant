@@ -190,12 +190,11 @@ module ActiveMerchant #:nodoc:
           response = parse(raw_response)
         end
 
-        success = success_from(action, response)
         Response.new(
-          success,
-          message_from(action, response),
-          response,
-          error_code: success ? nil : error_code_from(response),
+          response['status'],
+          response['msg'],
+          response['data'],
+          error_code: success_from(action, response) ? nil : error_code_from(response),
           network_transaction_id: network_transaction_id_from(response),
           avs_result: AVSResult.new(code: avs_code_from(response)),
           cvv_result: CVVResult.new(cvv_result_from(response))
@@ -244,10 +243,8 @@ module ActiveMerchant #:nodoc:
         case action
         when 'token-auth'
           response['status'] == 'successful'
-        when 'transaction'
-          response['data']['response'] == 'approved'
         else
-          false
+          response['status'] == 'success'
         end
       end
 
